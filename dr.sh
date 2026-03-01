@@ -1,6 +1,35 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 MODEL="qwen2.5:0.5b"
+
+# =========================
+# 🚀 AUTO OLLAMA START + WARMUP
+# =========================
+
+# Start Ollama server if not running
+if ! pgrep -f "ollama serve" >/dev/null; then
+    echo "🚀 Starting Ollama server..."
+    ollama serve >/dev/null 2>&1 &
+    sleep 2
+fi
+
+# Warmup model (only if not already loaded recently)
+WARMUP_FILE="/tmp/.dr_model_warm"
+
+if [ ! -f "$WARMUP_FILE" ] || [ $(( $(date +%s) - $(stat -c %Y "$WARMUP_FILE" 2>/dev/null || echo 0) )) -gt 300 ]; then
+
+    JSON=$(jq -n \
+      --arg model "$MODEL" \
+      '{model:$model, prompt:"hi", stream:false}')
+
+    curl -s \
+      -H "Content-Type: application/json" \
+      -X POST http://localhost:11434/api/generate \
+      -d "$JSON" >/dev/null 2>&1
+
+    touch "$WARMUP_FILE"
+fi
+
 QUESTION="$*"
 
 if [ -z "$QUESTION" ]; then
